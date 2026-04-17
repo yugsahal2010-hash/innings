@@ -28,3 +28,5 @@ class InningsSummaryResponse(BaseModel):
     batters: List[BatterStat]
     bowlers: List[BowlerStat]
     recent_balls: List[str]
+class ErrorResponse(BaseModel):
+    detail: str    
