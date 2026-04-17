@@ -1,107 +1,103 @@
 from typing import Optional
 
-# --- Generation Logic for a Full 20 Over Demo ---
 def generate_full_20_overs():
     events = []
     batters = ["Virat Kohli", "Rohit Sharma", "Suryakumar Yadav", "Hardik Pandya", "Rishabh Pant"]
     bowlers = ["Shaheen Afridi", "Naseem Shah", "Haris Rauf", "Shadab Khan"]
-    
-    current_striker_idx = 0
-    current_non_striker_idx = 1
+    curr_s, curr_ns = 0, 1
     
     for over in range(20):
-        bowler = bowlers[over % len(bowlers)]
+        bowler_name = bowlers[over % len(bowlers)]
         for ball in range(1, 7):
-            # Simulate realistic runs (0s, 1s, 4s, 6s)
-            runs = [0, 0, 1, 1, 2, 4, 6][(over + ball) % 7]
-            is_wicket = True if (over > 15 and ball == 6) else False # Wickets in death overs
-            
-            striker = batters[current_striker_idx % len(batters)]
-            non_striker = batters[current_non_striker_idx % len(batters)]
-            
-            event = {
-                "striker": striker,
-                "non_striker": non_striker,
-                "bowler": bowler,
+            runs = [0, 1, 0, 4, 1, 6][(over + ball) % 6]
+            is_wkt = True if (over > 18 and ball == 6) else False
+            events.append({
+                "striker": batters[curr_s % len(batters)],
+                "bowler": bowler_name,
                 "runs_off_bat": runs,
                 "extras": 0,
                 "extra_type": "",
                 "is_legal_delivery": True,
-                "wicket_fell": is_wicket,
-                "wicket_type": "caught" if is_wicket else ""
-            }
-            events.append(event)
-            
-            if is_wicket:
-                current_striker_idx += 1 # Next batter comes in
-            elif runs % 2 != 0:
-                current_striker_idx, current_non_striker_idx = current_non_striker_idx, current_striker_idx
-                
+                "wicket_fell": is_wkt,
+                "wicket_type": "caught" if is_wkt else ""
+            })
+            if is_wkt: curr_s += 1
+            elif runs % 2 != 0: curr_s, curr_ns = curr_ns, curr_s
     return events
 
-FULL_20_OVER_DATA = generate_full_20_overs()
-
-# --- Calculation Logic ---
+# Pre-load the data
+FULL_DATA = generate_full_20_overs()
 
 def get_innings_summary(innings_id: int) -> Optional[dict]:
     if innings_id != 1: return None
-    events = FULL_20_OVER_DATA
+    events = FULL_DATA
     
-    total_runs = sum(e["runs_off_bat"] + e["extras"] for e in events)
-    total_wickets = sum(1 for e in events if e["wicket_fell"])
-    legal_balls = sum(1 for e in events if e["is_legal_delivery"])
-    
-    # Player Analytics
-    batter_stats = {}
-    bowler_stats = {}
-
+    # --- 1. Calculate Batter Stats ---
+    b_map = {}
     for e in events:
-        # Batter Math
-        s = e["striker"]
-        if s not in batter_stats:
-            batter_stats[s] = {"name": s, "runs": 0, "balls": 0, "dots": 0, "4s": 0, "6s": 0}
-        
-        batter_stats[s]["runs"] += e["runs_off_bat"]
-        if e["is_legal_delivery"]: batter_stats[s]["balls"] += 1
-        if e["runs_off_bat"] == 0 and e["extra_type"] == "": batter_stats[s]["dots"] += 1
-        if e["runs_off_bat"] == 4: batter_stats[s]["4s"] += 1
-        if e["runs_off_bat"] == 6: batter_stats[s]["6s"] += 1
+        name = e["striker"]
+        if name not in b_map:
+            b_map[name] = {"runs": 0, "balls": 0, "4s": 0, "6s": 0}
+        b_map[name]["runs"] += e["runs_off_bat"]
+        b_map[name]["balls"] += 1
+        if e["runs_off_bat"] == 4: b_map[name]["4s"] += 1
+        if e["runs_off_bat"] == 6: b_map[name]["6s"] += 1
 
-        # Bowler Math
-        b = e["bowler"]
-        if b not in bowler_stats:
-            bowler_stats[b] = {"name": b, "runs": 0, "balls": 0, "wickets": 0, "dots": 0}
-        
-        bowler_stats[b]["runs"] += (e["runs_off_bat"] + e["extras"])
-        if e["is_legal_delivery"]: bowler_stats[b]["balls"] += 1
-        if e["runs_off_bat"] == 0 and e["extras"] == 0: bowler_stats[b]["dots"] += 1
-        if e["wicket_fell"]: bowler_stats[b]["wickets"] += 1
+    batters_list = []
+    for name, stat in b_map.items():
+        sr = round((stat["runs"] / stat["balls"]) * 100, 2) if stat["balls"] > 0 else 0.0
+        batters_list.append({
+            "name": name, "runs": stat["runs"], "balls": stat["balls"],
+            "fours": stat["4s"], "sixes": stat["6s"], "strike_rate": sr
+        })
 
-    # Formatting Lists
-    final_batters = [
-        {
-            "name": k, "runs": v["runs"], "balls": v["balls"], "dot_balls": v["dots"],
-            "fours": v["4s"], "sixes": v["6s"],
-            "strike_rate": round((v["runs"]/v["balls"])*100, 2) if v["balls"] > 0 else 0
-        } for k, v in batter_stats.items()
-    ]
+    # --- 2. Calculate Bowler Stats ---
+    bw_map = {}
+    for e in events:
+        name = e["bowler"]
+        if name not in bw_map:
+            bw_map[name] = {"runs": 0, "balls": 0, "wickets": 0}
+        bw_map[name]["runs"] += (e["runs_off_bat"] + e["extras"])
+        bw_map[name]["balls"] += 1
+        if e["wicket_fell"]: bw_map[name]["wickets"] += 1
 
-    final_bowlers = [
-        {
-            "name": k, "overs": f"{v['balls']//6}.{v['balls']%6}", "runs": v["runs"],
-            "wickets": v["wickets"], "dot_balls": v["dots"],
-            "economy": round(v["runs"]/(v["balls"]/6), 2) if v["balls"] > 0 else 0
-        } for k, v in bowler_stats.items()
-    ]
+    bowlers_list = []
+    for name, stat in bw_map.items():
+        econ = round(stat["runs"] / (stat["balls"] / 6), 2) if stat["balls"] > 0 else 0.0
+        bowlers_list.append({
+            "name": name, "overs": f"{stat['balls']//6}.{stat['balls']%6}",
+            "runs": stat["runs"], "wickets": stat["wickets"], "economy": econ
+        })
+
+    # --- 3. Calculate Over-by-Over ---
+    over_by_over = []
+    temp_events = []
+    o_num = 1
+    for e in events:
+        temp_events.append(e)
+        if len(temp_events) == 6:
+            over_by_over.append({
+                "over_number": o_num,
+                "bowler": temp_events[0]["bowler"],
+                "runs": sum(x["runs_off_bat"] + x["extras"] for x in temp_events),
+                "wickets": sum(1 for x in temp_events if x["wicket_fell"]),
+                "ball_labels": [str(x["runs_off_bat"]) if not x["wicket_fell"] else "W" for x in temp_events]
+            })
+            temp_events, o_num = [], o_num + 1
+
+    # --- 4. Final Verification and Return ---
+    # Total calculations
+    total_r = sum(e["runs_off_bat"] + e["extras"] for e in events)
+    total_w = sum(1 for e in events if e["wicket_fell"])
 
     return {
         "innings_id": innings_id,
         "batting_team": "India",
-        "total_runs": total_runs,
-        "wickets": total_wickets,
-        "overs": f"{legal_balls // 6}.{legal_balls % 6}",
-        "run_rate": round(total_runs / (legal_balls / 6), 2),
-        "batters": final_batters,
-        "bowlers": final_bowlers,
+        "total_runs": total_r,
+        "wickets": total_w,
+        "overs": "20.0",
+        "batters": batters_list,
+        "bowlers": bowlers_list,
+        "over_by_over": over_by_over,
         "recent_balls": [str(e["runs_off_bat"]) if not e["wicket_fell"] else "W" for e in events[-6:]]
     }
