@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from schemas import InningsSummaryResponse, ErrorResponse
+from schemas import InningsSummaryInput, InningsSummaryResponse, ErrorResponse
 from services import get_innings_summary
 
 app = FastAPI(
@@ -17,17 +17,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 def home():
     return {"message": "Innings Summary API is live", "docs": "/docs"}
 
-@app.get(
-    "/api/innings/{innings_id}/summary/",
+
+@app.post(
+    "/api/innings/summary/",
     response_model=InningsSummaryResponse,
-    responses={404: {"model": ErrorResponse}},
+    responses={500: {"model": ErrorResponse}},
 )
-def read_innings_summary(innings_id: int):
-    result = get_innings_summary(innings_id)
-    if result is None:
-        raise HTTPException(status_code=404, detail="Innings data not found")
-    return result
+def read_innings_summary(input_data: InningsSummaryInput):
+    try:
+        return get_innings_summary(input_data.model_dump())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Calculation error: {str(e)}")
