@@ -1,4 +1,4 @@
-rom typing import Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 
 def get_innings_summary(data: Dict[str, Any]) -> dict:
