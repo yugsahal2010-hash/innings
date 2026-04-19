@@ -1,7 +1,23 @@
 from typing import List, Optional
 from pydantic import BaseModel
 
-class BatterStat(BaseModel):
+
+class BallEvent(BaseModel):
+    striker: str
+    bowler: str
+    runs_off_bat: int
+    extras: int
+    is_legal_delivery: bool
+    wicket_fell: bool
+
+
+class InningsSummaryInput(BaseModel):
+    innings_id: int
+    batting_team: str
+    ball_events: List[BallEvent]
+
+
+class TopBatter(BaseModel):
     name: str
     runs: int
     balls: int
@@ -9,19 +25,14 @@ class BatterStat(BaseModel):
     sixes: int
     strike_rate: float
 
-class BowlerStat(BaseModel):
+
+class TopBowler(BaseModel):
     name: str
     overs: str
     runs: int
     wickets: int
     economy: float
 
-class OverSummary(BaseModel):
-    over_number: int
-    bowler: str
-    runs: int
-    wickets: int
-    ball_labels: List[str]
 
 class InningsSummaryResponse(BaseModel):
     innings_id: int
@@ -29,10 +40,11 @@ class InningsSummaryResponse(BaseModel):
     total_runs: int
     wickets: int
     overs: str
-    batters: List[BatterStat]
-    bowlers: List[BowlerStat]
-    over_by_over: List[OverSummary]
+    run_rate: float
+    top_batter: Optional[TopBatter]
+    top_bowler: Optional[TopBowler]
     recent_balls: List[str]
+
 
 class ErrorResponse(BaseModel):
     detail: str
